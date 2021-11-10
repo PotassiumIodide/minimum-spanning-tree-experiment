@@ -1,20 +1,33 @@
 import src.greedy_algorithm as greedy
-from src import independence_judger
-from src import basis_superset_judger
+from src import independence_oracle
+from src import basis_superset_oracle
 from src.function import functionize, generalize
 from src import dual
 
-def solve_MST_problem(M, w):
+def solve_MST_problem(M, weight_function):
     E, D = M
-    judger = independence_judger.by_bases(D)
-    ans = greedy.best_in(E, w, judger)
-    print(f"最良選択貪欲法による解: {ans}")
+    D_ast = dual.of_bases(E, D) # 基族の双対
 
-    D_ast = dual.of_bases(E, D)
-    # print(f"D* = {D_ast}")
-    judger = basis_superset_judger.by_bases(D_ast)
-    ans = E - greedy.worst_out(E, w, judger)
-    print(f"最悪棄却貪欲法による解: {ans}")
+    # 重み関数wの一般化とw'の設定
+    w = generalize(weight_function)
+    w_max = max(w(e) for e in E)
+    w_prime = generalize(lambda e: w_max - weight_function(e) + 1)
+
+    # 独立性オラクルの設定
+    indep_oracle = independence_oracle.by_bases(D)
+    # 基拡大集合オラクルの設定
+    bs_oracle = basis_superset_oracle.by_bases(D_ast)
+
+    ans_max_best_in = greedy.best_in_with_log(E, w_prime, indep_oracle, maximize=True)
+    ans_min_best_in = greedy.best_in(E, w, indep_oracle)
+    ans_max_worst_out = E - greedy.worst_out(E, w, bs_oracle)
+    ans_min_worst_out = E - greedy.worst_out(E, w_prime, bs_oracle, minimize=True)
+
+    print(f"最大化問題に対する最良選択貪欲法による解: {ans_max_best_in}")
+    print(f"最小化問題に対する最良選択貪欲法による解: {ans_min_best_in}")
+    print(f"最大化問題に対する最悪棄却貪欲法による解: {ans_max_worst_out}")
+    print(f"最小化問題に対する最悪棄却貪欲法による解: {ans_min_worst_out}")
+
 
 if __name__ == "__main__":
     E = {1,2,3,4,5,6}
@@ -28,6 +41,6 @@ if __name__ == "__main__":
         5:  6,
         6: 28
     }
-    w = generalize(functionize(weights))
+    w = functionize(weights)
 
     solve_MST_problem(M, w)
